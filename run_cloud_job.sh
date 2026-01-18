@@ -23,6 +23,9 @@ if [ -d "assets_cloud/assets" ]; then
     rmdir assets_cloud/assets
 fi
 
+# 2.6 Ensure model config is present (fixes FileNotFoundError)
+cp model_configuration.yaml pretrained_models/23-51-11/cfg.yaml
+
 # 3. Run Inference
 echo "Running FoundationStereo (Standard Mode)..."
 python scripts/run_demo.py \
