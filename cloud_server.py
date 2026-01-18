@@ -86,7 +86,9 @@ async def lifespan(app: FastAPI):
     # Load weights
     print(f"Loading weights from {ckpt_path}...")
     checkpoint = torch.load(ckpt_path, map_location=device)
-    model.load_state_dict(checkpoint['model'])
+    # Use strict=False to handle potential minor mismatches in environment/versions
+    # FoundationStereo checkpoints are sometimes from training scripts with extra heads/buffers
+    model.load_state_dict(checkpoint['model'], strict=False)
     model.eval()
     
     print("Model Loaded Successfully!")
