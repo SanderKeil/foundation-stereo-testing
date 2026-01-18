@@ -1,6 +1,9 @@
 #!/bin/bash
 set -e
 
+# 0. Safety measure: ensure deps are installed (fixes imageio error)
+pip install imageio opencv-python-headless scikit-image
+
 # 1. Check for assets
 if [ ! -f "assets.zip" ]; then
     echo "Error: assets.zip not found! Please upload it first."
@@ -10,6 +13,12 @@ fi
 # 2. Unzip assets
 echo "Unzipping assets..."
 unzip -o assets.zip -d assets_cloud/
+
+# 2.5 Handle potential 'assets' subfolder in the zip
+if [ -d "assets_cloud/assets" ]; then
+    mv assets_cloud/assets/* assets_cloud/
+    rmdir assets_cloud/assets
+fi
 
 # 3. Run Inference
 echo "Running FoundationStereo (Standard Mode)..."
