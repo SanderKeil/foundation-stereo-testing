@@ -6,7 +6,7 @@ echo "Starting FoundationStereo setup on RunPod..."
 # 1. Install system dependencies for OpenCV
 echo "Installing system dependencies..."
 apt-get update
-apt-get install -y libgl1-mesa-glx libglib2.0-0 git
+apt-get install -y libgl1-mesa-glx libglib2.0-0 git zip unzip
 
 # 2. Install Python dependencies
 echo "Installing Python requirements..."
