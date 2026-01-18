@@ -53,6 +53,18 @@ async def lifespan(app: FastAPI):
     cfg.mixed_precision = True
     cfg.restore_ckpt = ckpt_path
     
+    # Missing args from error log:
+    if not hasattr(cfg, 'vit_size'):
+        cfg.vit_size = 'base' # Default assumption
+    if not hasattr(cfg, 'n_downsample'):
+        cfg.n_downsample = 2
+    if not hasattr(cfg, 'n_gru_layers'):
+        cfg.n_gru_layers = 3
+    if not hasattr(cfg, 'corr_radius'):
+        cfg.corr_radius = 4
+    if not hasattr(cfg, 'corr_levels'):
+        cfg.corr_levels = 4
+    
     # Initialize model
     model = FoundationStereo(cfg)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
