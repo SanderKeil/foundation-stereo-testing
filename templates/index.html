@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>FoundationStereo Live Stream</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            background: #222;
+            color: white;
+            text-align: center;
+        }
+
+        .grid {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .box {
+            background: #333;
+            padding: 10px;
+            border-radius: 8px;
+        }
+
+        img {
+            width: 480px;
+            height: auto;
+            border-radius: 4px;
+        }
+
+        h2 {
+            margin: 5px 0;
+            font-size: 1.2rem;
+        }
+
+        .controls {
+            margin: 20px;
+        }
+
+        input {
+            padding: 8px;
+            width: 300px;
+        }
+
+        button {
+            padding: 8px 16px;
+            cursor: pointer;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+        }
+
+        #latency {
+            color: #0f0;
+            font-weight: bold;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>FoundationStereo Live Interface</h1>
+
+    <div class="controls">
+        <label>Cloud API URL:</label>
+        <input type="text" id="apiUrl" value="https://YOUR-RUNPOD-ID.proxy.runpod.net/process"
+            placeholder="https://ID.proxy.runpod.net/process">
+        <button onclick="startStream()">Start Inference</button>
+        <p>Latency: <span id="latency">0</span> ms</p>
+    </div>
+
+    <div class="grid">
+        <div class="box">
+            <h2>Left Camera (Local)</h2>
+            <!-- Directly stream from local endpoint if implemented, or just use JS to refresh? 
+                 Actually, FastAPI StreamingResponse is easiest for raw video.
+            -->
+            <!-- <img src="/video_feed/left" /> -->
+            <p>Raw feeds hidden to save bandwidth/local CPU (TODO)</p>
+        </div>
+
+        <div class="box">
+            <h2>Depth Prediction (Cloud)</h2>
+            <img id="depthResult" src="" alt="Waiting for stream..." />
+        </div>
+    </div>
+
+    <script>
+        let ws;
+
+        function startStream() {
+            const url = document.getElementById('apiUrl').value;
+
+            // Send the URL to the server so it knows where to send images?
+            // Actually, my local_app implementation hardcoded CLOUD_URL global. 
+            // Better design: Pass URL in a "config" message to WS or update logic.
+            // For MVP, let's just ask user to update the Python file OR handle it.
+
+            alert("Ensure you updated CLOUD_URL in local_app.py or I will implement dynamic URL support next!");
+
+            const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+            const wsUrl = `${protocol}//${window.location.host}/ws/inference`;
+
+            ws = new WebSocket(wsUrl);
+            ws.binaryType = "arraybuffer"; // Expect image bytes
+
+            let lastTime = Date.now();
+
+            ws.onopen = () => {
+                console.log("Connected to Local Backend");
+            };
+
+            ws.onmessage = (event) => {
+                // Receive result image bytes
+                const arrayBuffer = event.data;
+                const blob = new Blob([arrayBuffer], { type: "image/jpeg" });
+                const url = URL.createObjectURL(blob);
+
+                document.getElementById('depthResult').src = url;
+
+                // Calc latency (approx loop time)
+                const now = Date.now();
+                const diff = now - lastTime;
+                lastTime = now;
+                document.getElementById('latency').innerText = diff;
+            };
+
+            ws.onclose = () => {
+                console.log("Disconnected");
+            }
+        }
+    </script>
+</body>
+
+</html>
