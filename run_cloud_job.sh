@@ -2,7 +2,8 @@
 set -e
 
 # 0. Safety measure: ensure deps are installed (fixes imageio error)
-pip install imageio opencv-python-headless scikit-image
+# 0. Safety measure: ensure deps are installed
+pip install imageio opencv-python-headless scikit-image open3d timm einops omegaconf
 
 # 1. Check for assets
 if [ ! -f "assets.zip" ]; then
