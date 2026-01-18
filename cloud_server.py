@@ -55,7 +55,7 @@ async def lifespan(app: FastAPI):
     
     # Missing args from error log:
     if not hasattr(cfg, 'vit_size'):
-        cfg.vit_size = 'base' # Default assumption
+        cfg.vit_size = 'vitl' # Changed from 'base' to 'vitl' based on extractor.py
     if not hasattr(cfg, 'n_downsample'):
         cfg.n_downsample = 2
     if not hasattr(cfg, 'n_gru_layers'):
