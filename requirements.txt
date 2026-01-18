@@ -1,0 +1,14 @@
+torch
+torchvision
+torchaudio
+scikit-image
+omegaconf
+opencv-contrib-python
+imageio
+open3d
+timm
+einops
+gdown
+# optional or problematic?
+# transformations
+# xformers

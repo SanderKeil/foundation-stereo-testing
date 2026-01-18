@@ -4,3 +4,7 @@ output/*
 weight/
 __pycache__
 DATA/*
+# Local env and outputs
+.venv/
+test_outputs*/
+

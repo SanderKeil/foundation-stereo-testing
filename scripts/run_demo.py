@@ -57,13 +57,19 @@ if __name__=="__main__":
   logging.info(f"args:\n{args}")
   logging.info(f"Using pretrained model from {ckpt_dir}")
 
+  device = 'cuda' if torch.cuda.is_available() else 'cpu'
+  logging.info(f"Using device: {device}")
+
   model = FoundationStereo(args)
 
-  ckpt = torch.load(ckpt_dir)
+  if device == 'cpu':
+    ckpt = torch.load(ckpt_dir, map_location='cpu', weights_only=False)
+  else:
+    ckpt = torch.load(ckpt_dir, weights_only=False)
   logging.info(f"ckpt global_step:{ckpt['global_step']}, epoch:{ckpt['epoch']}")
   model.load_state_dict(ckpt['model'])
 
-  model.cuda()
+  model.to(device)
   model.eval()
 
   code_dir = os.path.dirname(os.path.realpath(__file__))
@@ -77,12 +83,20 @@ if __name__=="__main__":
   img0_ori = img0.copy()
   logging.info(f"img0: {img0.shape}")
 
-  img0 = torch.as_tensor(img0).cuda().float()[None].permute(0,3,1,2)
-  img1 = torch.as_tensor(img1).cuda().float()[None].permute(0,3,1,2)
+  img0 = torch.as_tensor(img0).to(device).float()[None].permute(0,3,1,2)
+  img1 = torch.as_tensor(img1).to(device).float()[None].permute(0,3,1,2)
   padder = InputPadder(img0.shape, divis_by=32, force_square=False)
   img0, img1 = padder.pad(img0, img1)
 
-  with torch.cuda.amp.autocast(True):
+  # Use generic autocast if available or just dummy context
+  if device == 'cuda':
+      autocast_ctx = torch.cuda.amp.autocast(True)
+  else:
+      # For CPU we can use torch.cpu.amp.autocast() in newer torch or just nullcontext
+      import contextlib
+      autocast_ctx = contextlib.nullcontext()
+
+  with autocast_ctx:
     if not args.hiera:
       disp = model.forward(img0, img1, iters=args.valid_iters, test_mode=True)
     else:
@@ -123,12 +137,13 @@ if __name__=="__main__":
       o3d.io.write_point_cloud(f'{args.out_dir}/cloud_denoise.ply', inlier_cloud)
       pcd = inlier_cloud
 
-    logging.info("Visualizing point cloud. Press ESC to exit.")
-    vis = o3d.visualization.Visualizer()
-    vis.create_window()
-    vis.add_geometry(pcd)
-    vis.get_render_option().point_size = 1.0
-    vis.get_render_option().background_color = np.array([0.5, 0.5, 0.5])
-    vis.run()
-    vis.destroy_window()
+    # logging.info("Visualizing point cloud. Press ESC to exit.")
+    # vis = o3d.visualization.Visualizer()
+    # vis.create_window()
+    # vis.add_geometry(pcd)
+    # vis.get_render_option().point_size = 1.0
+    # vis.get_render_option().background_color = np.array([0.5, 0.5, 0.5])
+    # vis.run()
+    # vis.destroy_window()
+    logging.info("Visualization skipped for headless execution.")
 
