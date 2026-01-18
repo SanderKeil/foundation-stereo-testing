@@ -28,6 +28,18 @@ async def lifespan(app: FastAPI):
     print("Loading FoundationStereo Model...")
     
     ckpt_path = "pretrained_models/23-51-11/model_best_bp2.pth"
+    # Fallback search if not found directly
+    if not os.path.exists(ckpt_path):
+        print(f"Checkpoint not found at {ckpt_path}, searching...")
+        found = False
+        for root, dirs, files in os.walk("pretrained_models"):
+            if "model_best_bp2.pth" in files:
+                ckpt_path = os.path.join(root, "model_best_bp2.pth")
+                print(f"Found checkpoint at: {ckpt_path}")
+                found = True
+                break
+        if not found:
+            raise FileNotFoundError("Could not find model_best_bp2.pth inside pretrained_models/")
     # Try different config locations
     cfg_locations = [
         "pretrained_models/23-51-11/cfg.yaml",
