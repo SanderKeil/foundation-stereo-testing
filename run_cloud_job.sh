@@ -3,6 +3,8 @@ set -e
 
 # 0. Safety measure: ensure deps are installed (fixes imageio error)
 # 0. Safety measure: ensure deps are installed
+# Fix for "Cannot uninstall blinker" error
+pip install --ignore-installed blinker
 pip install imageio opencv-python-headless scikit-image open3d timm einops omegaconf
 
 # 1. Check for assets
