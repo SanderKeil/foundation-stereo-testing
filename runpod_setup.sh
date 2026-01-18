@@ -14,6 +14,9 @@ echo "Installing Python requirements..."
 pip install gdown
 # Install project requirements
 pip install -r requirements.txt
+# Streaming & Fixes
+pip install --ignore-installed blinker
+pip install imageio opencv-python-headless scikit-image open3d timm einops omegaconf trimesh pandas joblib fastapi uvicorn python-multipart
 
 # 3. Download Model Weights
 echo "Downloading Model Weights (23-51-11)..."
