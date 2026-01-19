@@ -65,10 +65,13 @@
 
     <div class="controls">
         <label>Cloud API URL:</label>
-        <input type="text" id="apiUrl" value="https://YOUR-RUNPOD-ID.proxy.runpod.net/process"
-            placeholder="https://ID.proxy.runpod.net/process">
+        <input type="text" id="apiUrl" value="{{ cloud_url }}" placeholder="Cloud URL from local_app.py" readonly
+            style="width: 400px; color: #888;">
         <button onclick="startStream()">Start Inference</button>
         <p>Latency: <span id="latency">0</span> ms</p>
+        <div id="statusLog"
+            style="margin-top: 10px; color: #aaa; font-size: 0.9em; height: 100px; overflow-y: scroll; border: 1px solid #444; padding: 5px;">
+            Ready. Click Start.</div>
     </div>
 
     <div class="grid">
@@ -77,8 +80,8 @@
             <!-- Directly stream from local endpoint if implemented, or just use JS to refresh? 
                  Actually, FastAPI StreamingResponse is easiest for raw video.
             -->
-            <!-- <img src="/video_feed/left" /> -->
-            <p>Raw feeds hidden to save bandwidth/local CPU (TODO)</p>
+            <img src="/video_feed/left" />
+            <!-- <p>Raw feeds hidden to save bandwidth/local CPU (TODO)</p> -->
         </div>
 
         <div class="box">
@@ -90,26 +93,35 @@
     <script>
         let ws;
 
+        function log(msg) {
+            const el = document.getElementById("statusLog");
+            el.innerHTML += "<div>" + new Date().toLocaleTimeString() + ": " + msg + "</div>";
+            el.scrollTop = el.scrollHeight;
+            console.log(msg);
+        }
+
         function startStream() {
-            const url = document.getElementById('apiUrl').value;
-
-            // Send the URL to the server so it knows where to send images?
-            // Actually, my local_app implementation hardcoded CLOUD_URL global. 
-            // Better design: Pass URL in a "config" message to WS or update logic.
-            // For MVP, let's just ask user to update the Python file OR handle it.
-
-            alert("Ensure you updated CLOUD_URL in local_app.py or I will implement dynamic URL support next!");
-
+            log("Initializing connection...");
             const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-            const wsUrl = `${protocol}//${window.location.host}/ws/inference`;
+            let host = window.location.host;
+            if (host.includes("0.0.0.0")) {
+                host = host.replace("0.0.0.0", "127.0.0.1");
+                log("Corrected invalid host 0.0.0.0 to 127.0.0.1");
+            }
+            const wsUrl = `${protocol}//${host}/ws/inference`;
+            log("Connecting to: " + wsUrl);
 
             ws = new WebSocket(wsUrl);
-            ws.binaryType = "arraybuffer"; // Expect image bytes
+            ws.binaryType = "arraybuffer";
 
             let lastTime = Date.now();
 
             ws.onopen = () => {
-                console.log("Connected to Local Backend");
+                log("Connected to Local Backend! Waiting for frames...");
+            };
+
+            ws.onerror = (e) => {
+                log("WebSocket Error: " + JSON.stringify(e));
             };
 
             ws.onmessage = (event) => {
@@ -125,10 +137,11 @@
                 const diff = now - lastTime;
                 lastTime = now;
                 document.getElementById('latency').innerText = diff;
+                // log("Frame received: " + diff + "ms");
             };
 
-            ws.onclose = () => {
-                console.log("Disconnected");
+            ws.onclose = (e) => {
+                log("Disconnected. Code: " + e.code + " Reason: " + e.reason);
             }
         }
     </script>

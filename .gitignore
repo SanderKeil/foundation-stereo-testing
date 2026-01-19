@@ -1,10 +1,14 @@
-pretrained_models/*
-output/*
+__pycache__/
 *.pyc
-weight/
-__pycache__
-DATA/*
-# Local env and outputs
-.venv/
+*.jpg
+*.png
+*.zip
+*_b64.txt
+*_wrapped.txt
+view_cloud.html
 test_outputs*/
-
+output/
+debug_*.jpg
+cloud_server_fixed.py
+.venv/
+.ipynb_checkpoints/

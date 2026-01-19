@@ -75,6 +75,9 @@ def capture_stereo(device_id_left, device_id_right, output_dir="assets"):
     cap2.release()
     
     if ret1 and ret2:
+        # Force resize to match expected dimensions
+        frame1 = cv2.resize(frame1, (640, 480))
+        frame2 = cv2.resize(frame2, (640, 480))
         cv2.imwrite(f"{output_dir}/my_left.png", frame1)
         cv2.imwrite(f"{output_dir}/my_right.png", frame2)
         print("Synchronized capture saved.")
@@ -89,7 +92,8 @@ if __name__ == "__main__":
     # video4: Brio 301
     
     # Prioritize 6 and 4 as they were the ones locked by Chrome.
-    if capture_stereo(6, 4):
+    output_path = "../assets"
+    if capture_stereo(6, 4, output_dir=output_path):
         print("Success capturing from 6 and 4.")
         sys.exit(0)
         
@@ -125,10 +129,10 @@ if __name__ == "__main__":
         cams = [x for x in valid_indices if x != 2] # Exclude internal if possible
         if len(cams) >= 2:
             print(f"Capturing from {cams[0]} and {cams[1]}")
-            capture_stereo(cams[0], cams[1])
+            capture_stereo(cams[0], cams[1], output_dir=output_path)
         elif len(cams) == 1 and 2 in valid_indices:
              print(f"Could not find two Brios. Capturing from {cams[0]} (Brio?) and 2 (Internal).")
-             capture_stereo(cams[0], 2)
+             capture_stereo(cams[0], 2, output_dir=output_path)
         else:
              print("Not enough cameras found.")
 
