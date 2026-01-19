@@ -16,6 +16,7 @@
             justify-content: center;
             gap: 20px;
             flex-wrap: wrap;
+            max-width: 100%;
         }
 
         .box {
@@ -74,14 +75,32 @@
             Ready. Click Start.</div>
     </div>
 
+    <!-- NEW MANUAL CALIBRATION CONTROLS -->
+    <div class="controls" style="background:#444; padding:15px; border-radius:8px; display:inline-block;">
+        <h3>🔧 Manual Calibration (Vertical Shift)</h3>
+        <p style="font-size:0.9em; color:#ccc; margin-bottom:10px;">
+            The model fails if the cameras aren't perfectly aligned vertically. <br>
+            <b>Slowly</b> drag this slider until the depth map suddenly "pops" into focus.
+        </p>
+        <div style="display:flex; align-items:center; gap:10px;">
+            <label>Right Camera Vertical Shift:</label>
+            <input type="range" id="shiftSlider" min="-100" max="100" value="0" step="1" style="width:300px;"
+                oninput="updateShift(this.value)">
+            <input type="number" id="shiftValue" value="0" style="width: 60px; padding:5px;"
+                onchange="updateShift(this.value)">
+            <span>pixels</span>
+        </div>
+    </div>
+
     <div class="grid">
         <div class="box">
             <h2>Left Camera (Local)</h2>
-            <!-- Directly stream from local endpoint if implemented, or just use JS to refresh? 
-                 Actually, FastAPI StreamingResponse is easiest for raw video.
-            -->
             <img src="/video_feed/left" />
-            <!-- <p>Raw feeds hidden to save bandwidth/local CPU (TODO)</p> -->
+        </div>
+
+        <div class="box">
+            <h2>Right Camera (Local)</h2>
+            <img src="/video_feed/right" />
         </div>
 
         <div class="box">
@@ -143,6 +162,16 @@
             ws.onclose = (e) => {
                 log("Disconnected. Code: " + e.code + " Reason: " + e.reason);
             }
+        }
+        function updateShift(val) {
+            document.getElementById('shiftSlider').value = val;
+            document.getElementById('shiftValue').value = val;
+
+            fetch('/set_shift', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ shift: parseInt(val) })
+            }).then(r => console.log("Shift updated to " + val));
         }
     </script>
 </body>

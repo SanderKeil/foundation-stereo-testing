@@ -21,7 +21,47 @@ right_cap = None
 global_left_frame = None
 global_right_frame = None
 import threading
+import threading
 camera_lock = threading.Lock()
+stop_camera_thread = False
+camera_lock = threading.Lock()
+stop_camera_thread = False
+camera_thread = None
+
+# Global Image Processing Parameters
+global_vertical_shift = 0
+
+
+def camera_loop():
+    global global_left_frame, global_right_frame, left_cap, right_cap, stop_camera_thread
+    print("Background Camera Loop Started")
+    while not stop_camera_thread:
+        if left_cap is None or right_cap is None:
+            time.sleep(1)
+            continue
+            
+        try:
+             # Grab both first to sync as best as possible
+             l_ret = left_cap.grab()
+             r_ret = right_cap.grab()
+             
+             if l_ret and r_ret:
+                 _, frame_left = left_cap.retrieve()
+                 _, frame_right = right_cap.retrieve()
+                 
+                 if frame_left is not None: 
+                     global_left_frame = frame_left
+                 if frame_right is not None: 
+                     global_right_frame = frame_right.copy()
+             else:
+                 # If grab fails, release and re-init? No, just wait.
+                 time.sleep(0.1)
+                 
+        except Exception as e:
+            print(f"Cam Error: {e}")
+            time.sleep(0.5)
+            
+        time.sleep(0.01) # Max ~100 FPS cap
 
 def set_camera_options(cap):
     cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'))
@@ -29,7 +69,7 @@ def set_camera_options(cap):
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
 
 def init_cameras():
-    global left_cap, right_cap
+    global left_cap, right_cap, camera_thread
     if left_cap and right_cap:
         return
 
@@ -44,6 +84,16 @@ def init_cameras():
                 cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'))
                 cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
                 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+                
+                # --- LOCK COMMANDS ---
+                # Attempt to disable Autofocus (0 = Off)
+                cap.set(cv2.CAP_PROP_AUTOFOCUS, 0) 
+                
+                # Attempt to lock White Balance (Auto=0). 
+                # Note: Might need to set a specific temp, e.g. 4000.
+                cap.set(cv2.CAP_PROP_AUTO_WB, 0)
+                cap.set(cv2.CAP_PROP_WB_TEMPERATURE, 4000)
+                
                 # Test read
                 ret, _ = cap.read()
                 if ret:
@@ -69,6 +119,10 @@ def init_cameras():
             print("CRITICAL: Failed to open both cameras!")
         else:
             print("Cameras Initialized Successfully.")
+            # START THREAD IF NOT RUNNING
+            if camera_thread is None or not camera_thread.is_alive():
+                camera_thread = threading.Thread(target=camera_loop, daemon=True)
+                camera_thread.start()
             
     except Exception as e:
         print(f"Camera Open Error: {e}")
@@ -111,6 +165,19 @@ async def video_feed(camera_id: str):
     return StreamingResponse(generate_camera_stream(camera_id), media_type="multipart/x-mixed-replace; boundary=frame")
 
 
+# --- NEW PARAMS ENDPOINT ---
+from pydantic import BaseModel
+class ShiftUpdate(BaseModel):
+    shift: int
+
+@app.post("/set_shift")
+async def set_shift(update: ShiftUpdate):
+    global global_vertical_shift
+    global_vertical_shift = update.shift
+    print(f"Update: Vertical Shift set to {global_vertical_shift}")
+    return {"status": "ok", "shift": global_vertical_shift}
+
+
 # The Magic Loop: Capture -> Send -> Result
 @app.websocket("/ws/inference")
 async def websocket_inference(websocket: WebSocket):
@@ -143,47 +210,31 @@ async def websocket_inference(websocket: WebSocket):
 
     try:
         while True:
-            # 1. Capture Safe Pair
-            if left_cap is None or right_cap is None:
-                 await asyncio.sleep(1)
+            # 1. READ GLOBALS ONLY
+            if global_left_frame is None or global_right_frame is None:
+                 await asyncio.sleep(0.1)
                  continue
 
-            try:
-                # Thread-safe read?
-                # Actually, since we are the MAIN loop, we own the camera.
-                # But we should update the globals for the other endpoint.
-                
-                left_cap.grab()
-                right_cap.grab()
-                _, frame_left = left_cap.retrieve()
-                _, frame_right = right_cap.retrieve()
-                
-                # Update globals for the video feed
-                if frame_left is not None: 
-                    global_left_frame = frame_left
-                    # print(f"DEBUG: Captured Left {frame_left.shape}")
-                    # print(f"DEBUG: Encoded sizes: L={len(left_jpg)} R={len(right_jpg)}")
-                if frame_right is not None: 
-                    global_right_frame = frame_right
-                
-            except Exception as e:
-                print(f"Capture Error: {e}")
-                await asyncio.sleep(0.5)
-                continue
+            frame_left = global_left_frame
+            frame_right = global_right_frame
             
-            if frame_left is None or frame_right is None:
-                # print("Skipping dropped frame")
-                await asyncio.sleep(0.01)
-                continue
+            # --- APPLY MANUAL RECTIFICATION (Vertical Shift) ---
+            if global_vertical_shift != 0:
+                # Shift Right Image Up/Down to match Left
+                M = np.float32([[1, 0, 0], [0, 1, global_vertical_shift]])
+                # Use borderReplicate to avoid black bars messing up disparity
+                frame_right = cv2.warpAffine(frame_right, M, (frame_right.shape[1], frame_right.shape[0]), borderMode=cv2.BORDER_REPLICATE)
                 
-            # 2. Prepare for Upload
-            _, left_jpg = cv2.imencode('.jpg', frame_left)
-            _, right_jpg = cv2.imencode('.jpg', frame_right)
+                
+            # 2. Prepare for Upload - Use PNG for MAX QUALITY (Lossless)
+            # Latency will be high, but "fuzziness" will be gone.
+            _, left_png = cv2.imencode('.png', frame_left)
+            _, right_png = cv2.imencode('.png', frame_right)
             
             # Construct FormData for aiohttp
             data = aiohttp.FormData()
-            data.add_field('left_image', left_jpg.tobytes(), filename='left.jpg', content_type='image/jpeg')
-            data.add_field('right_image', right_jpg.tobytes(), filename='right.jpg', content_type='image/jpeg')
+            data.add_field('left_image', left_png.tobytes(), filename='left.png', content_type='image/png')
+            data.add_field('right_image', right_png.tobytes(), filename='right.png', content_type='image/png')
             
             # DEBUG: Save inputs to prove they are valid
             if debug_save_count < 3:
